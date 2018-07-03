@@ -1,78 +1,99 @@
 class WorldCup {
-	constructor(API_URL, element, country, interval) {
-		this.API_URL = API_URL
-		this.element = document.querySelector(element)
-		this.country = country
-		this.countryScore = 0
+	constructor(countryCode, interval) {
+		this.countryCode = countryCode
+		// this.API_URL = `https://worldcup.sfg.io/matches/country?fifa_code=${countryCode}`
+		this.API_URL = `http://localhost:8080/mockData.json`
 		this.interval = interval
-		this.nrOfIntervals = 0
+		this.requestCounter = 0
 		
 		this.init()
 	}
 
 	init() {
-		this.enqueue()
+		this.showLoader()
+		// setTimeout(() => {
+		// 	this.enqueue()
+		// }, 2000);
 		
-		setInterval(() => {
-			this.enqueue()
-		}, this.interval)
+		// setInterval(() => {
+		// 	this.enqueue()
+		// }, this.interval)
 	}
 
 	enqueue() {
-		this.getAllGames().then(allGames => {
-			this.allGames = allGames
-			this.countryGames = this.getCountryGames()
-			this.lastAnnouncedCountryGame = [...this.countryGames].pop()
-			this.teamKey = this.getTeamKey(this.lastAnnouncedCountryGame.num)
+		this.getJSON().then(response => {
+			if(this.isLoading) {
+				this.hideLoader()
+			}
 
-			this.updateCountryScore( Number(this.lastAnnouncedCountryGame[this.teamKey]) )
+			this.requestCounter++
+
+			this.latestAnnouncedGame = [...response].pop()
+
+			const teamKey = (this.latestAnnouncedGame.home_team.code === this.countryCode)
+				? 'home_team'
+				: 'away_team'
+
+			this.teamGoals = this.latestAnnouncedGame[teamKey].goals
+			this.teamEvents = this.latestAnnouncedGame[`${teamKey}_events`]
+			this.gameTime = Number(this.latestAnnouncedGame.time)
+			this.teamCountry = this.latestAnnouncedGame[`${teamKey}_country`]
+
 			this.updateDOM()
-			
-			console.log('this.nrOfIntervals:', this.nrOfIntervals)
+			console.log( 'Number of request: ', this.requestCounter )
+
 		})
 	}
 
-	updateDOM() {
-		this.element.innerHTML = `<p>${this.country} has ${this.countryScore} goals in their last announced game.</p>`
-	}
-
-	updateCountryScore(score) {
-		this.countryScore = score
-	}
-	
-	getAllGames() {
-		this.nrOfIntervals++
-
+	getJSON() {
 		return fetch(this.API_URL)
 			.then(res => res.json())
 			.then(json => json)
-		
-	}
-	
-	async updateAllGames() {
-		this.allGames = await this.getAllGames()
 	}
 
-	getCountryGames() {
-		return this.allGames.rounds.map(matchDay => {
-			return matchDay.matches
-				.filter(match => (match.team1.name === this.country) || (match.team2.name === this.country))[0]
-		}).filter(countryGame => countryGame)
+	showLoader() {
+		this.loaderElem = document.createElement('span')
+		this.loaderElem.classList.add('loader')
+
+		this.loaderElem.style = `
+			font-size: 100px;
+			position: absolute;
+			display: flex;
+			width: 100px;
+			height: 100px;
+			animation: spin 1.5s infinite;
+			transition: opacity 1s;
+		`
+
+		this.loaderElem.innerText = "⚽"
+		document.body.appendChild(this.loaderElem)
+		this.isLoading = true
 	}
 
-	getTeamKey(num) {
-		return (this.countryGames.filter(countryGame => {
-			return countryGame.num === num
-		})[0].team1.name === this.country)
-			? 'score1'
-			: 'score2'
+	hideLoader() {
+		// return new Promise(resolve => {
+			setTimeout(() => this.loaderElem.style.opacity = '0', 10)
+			this.loaderElem.addEventListener('transitionend', e => {
+				document.body.removeChild(this.loaderElem)
+				// resolve()
+			})
+			this.isLoading = false
+		// })
 	}
 
+	updateDOM() {
+		if(!this.textElem) {
+			this.textElem = document.createElement('p')
+			this.textElem.innerText = `${this.teamCountry} has ${this.teamGoals} goals in their last announced game.`
+			document.body.appendChild(this.textElem)
+			console.log( this.textElem )
+		} else {
+			this.textElem.innerText = `${this.teamCountry} has ${this.teamGoals} goals in their last announced game.`
+		}
+	}
 }
 
-const API_URL = 'https://raw.githubusercontent.com/openfootball/world-cup.json/master/2018/worldcup.json'
-const element = '#root'
-const country = 'Japan'
-const interval = 100000
+const countryCode = 'SWE'
+const interval = 5000
 
-new WorldCup(API_URL, element, country, interval)
+new WorldCup(countryCode, interval)
