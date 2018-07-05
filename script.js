@@ -87,30 +87,35 @@ class WorldCup {
 		return Promise.all(lightPromises)
 	}
 
-	setColor(color) {
-		let hue
-		switch (color) {
-			case 'yellow': hue = 10000; break
-			case 'blue':   hue = 46920; break
-			case 'red':    hue = 0; break
-			default: 	   hue = 5000; break
-		} 
+	setColor(color, withPause = 0) {
+		setTimeout(() => {
+			return new Promise(() => {
+				let hue
+				switch (color) {
+					case 'yellow': hue = 10000; break
+					case 'blue':   hue = 46920; break
+					default: 	   hue = 5000; break
+				} 
 
-		for(let light in this.hueLights) {
-			this.hue.light(light).setState({ hue: hue })
-		}
+				for(let light in this.hueLights) {
+					this.hue.light(light).setState({ hue: hue })
+				}
+			})
+		}, withPause)
 	}
 
 	dance() {
 		this.offAll()
 			.then(() => this.onAll())
+			.then(() => this.setColor('yellow'))
 			.then(() => this.fullBrightnessAll())
 			.then(() => this.fullSaturationAll())
-			.then(() => {
-				this.setColor('yellow')
-				setTimeout(() => this.offAll(), 2000)
-				this.onAll().then(() => this.setColor('blue') )
-			})
+			.then(() => this.setColor('yellow', 1000))
+			.then(() => this.setColor('blue', 1000))
+			.then(() => this.setColor('yellow', 1000))
+			.then(() => this.setColor('blue', 1000))
+			.then(() => this.setColor('yellow', 1000))
+			.then(() => this.setColor('blue', 1000))
 		// this.setColor('yellow')
 	// 	setTimeout(() => this.offAll(), 2000)
 	// 	await this.onAll()
