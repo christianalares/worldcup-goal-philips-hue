@@ -3,21 +3,32 @@ class WorldCup {
 		this.countryCode = countryCode
 		// this.API_URL = `https://worldcup.sfg.io/matches/country?fifa_code=${countryCode}`
 		this.API_URL = `http://localhost:8080/mockData.json`
+		this.flagUrl = `https://restcountries.eu/data/${countryCode.toLowerCase()}.svg`
 		this.interval = interval
 		this.requestCounter = 0
 		
 		this.init()
 	}
-
+	
 	init() {
+		this.setBG()
 		this.showLoader()
-		// setTimeout(() => {
-		// 	this.enqueue()
-		// }, 2000);
+		
+		setTimeout(() => {
+			this.enqueue()
+		}, 2000);
 		
 		// setInterval(() => {
 		// 	this.enqueue()
 		// }, this.interval)
+	}
+
+	setBG() {
+		document.body.style = `
+			background: url(${this.flagUrl}) left top no-repeat;
+			background-size: cover;
+
+		`
 	}
 
 	enqueue() {
@@ -56,13 +67,14 @@ class WorldCup {
 		this.loaderElem.classList.add('loader')
 
 		this.loaderElem.style = `
-			font-size: 100px;
 			position: absolute;
-			display: flex;
-			width: 100px;
-			height: 100px;
-			animation: spin 1.5s infinite;
-			transition: opacity 1s;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			font-size: 100px;
+			transform-origin: 50% 44%;
+			animation: spin 0.8s linear infinite;
+			transition: opacity .5s;
 		`
 
 		this.loaderElem.innerText = "⚽"
