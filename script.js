@@ -5,8 +5,8 @@ class WorldCup {
 		this.countryCode = countryCode
 		this.teamGoals = 0
 		this.streamDelay = streamDelay
-		// this.API_URL = `https://worldcup.sfg.io/matches/country?fifa_code=${countryCode}`
-		this.API_URL = `http://localhost:1234/mockData.json`
+		this.API_URL = `https://worldcup.sfg.io/matches/country?fifa_code=${countryCode}`
+		// this.API_URL = `http://localhost:1234/mockData.json`
 		this.flagUrl = `https://restcountries.eu/data/${countryCode.toLowerCase()}.svg`
 
 		this.interval = interval
@@ -20,15 +20,34 @@ class WorldCup {
 
 		this.initLights().then(lights => {
 			this.hueLights = lights
+			this.initialState = this.setInitialState(lights)
 
-			this.newGoalTrigger()
-			// this.setColor('yellow')
+			// this.newGoalTrigger()
 
 			this.intervalId = setInterval(() => {
 				this.enqueue()
 			}, this.interval);
 
 		}).catch(e => console.error('initLights() Error', e))
+	}
+
+	setInitialState(lights) {
+		let initialState = []
+		for(const light in lights) {
+			initialState.push(lights[light].state)
+		}
+
+		return initialState
+	}
+
+	returnToInitialState() {
+		for(let light in this.hueLights) {
+			const index = Number(light - 1)
+
+			this.hue.light(light).setState({ bri: this.initialState[index].bri })
+				.then( this.hue.light(light).setState({ hue: this.initialState[index].hue }) )
+				.then( this.hue.light(light).setState({ sat: this.initialState[index].sat }) )
+		}
 	}
 
 	initLights() {
@@ -87,52 +106,72 @@ class WorldCup {
 		return Promise.all(lightPromises)
 	}
 
-	setColor(color, withPause = 0) {
-		setTimeout(() => {
-			return new Promise(() => {
-				let hue
-				switch (color) {
-					case 'yellow': hue = 10000; break
-					case 'blue':   hue = 46920; break
-					default: 	   hue = 5000; break
-				} 
+	setTransitionTime(transitiontime) {
+		let lightPromises = []
 
-				for(let light in this.hueLights) {
-					this.hue.light(light).setState({ hue: hue })
-				}
-			})
-		}, withPause)
+		for(let light in this.hueLights) {
+			lightPromises.push( this.hue.light(light).setState({ transitiontime }) )
+		}
+
+		return Promise.all(lightPromises)
 	}
 
-	dance() {
-		this.offAll()
-			.then(() => this.onAll())
-			.then(() => this.setColor('yellow'))
-			.then(() => this.fullBrightnessAll())
-			.then(() => this.fullSaturationAll())
-			.then(() => this.setColor('yellow', 1000))
-			.then(() => this.setColor('blue', 1000))
-			.then(() => this.setColor('yellow', 1000))
-			.then(() => this.setColor('blue', 1000))
-			.then(() => this.setColor('yellow', 1000))
-			.then(() => this.setColor('blue', 1000))
-		// this.setColor('yellow')
-	// 	setTimeout(() => this.offAll(), 2000)
-	// 	await this.onAll()
-	// 	this.setColor('blue')
-	// 	setTimeout(() => this.offAll(), 2000)
+	alertAll() {
+		this.onAll().then(() => {
+			for(let light in this.hueLights) {
+				this.hue.light(light).setState({ alert: 'select' })
+			}
+		})
 	}
 
-	blinkAll() {
-		setTimeout(() => {
-			this.onAll().then(() => {
-				for(let light in this.hueLights) {
-					this.hue.light(light).setState({ alert: 'select' })
-				}
-			})
-		}, this.streamDelay)
+	setColor(color) {
+		let hue
+		switch (color) {
+			case 'yellow':	hue = 10000; break
+			case 'blue':	hue = 46920; break
+			default:		hue = 5000; break
+		} 
+
+		for(let light in this.hueLights) {
+			this.hue.light(light).setState({ hue })
+		}
 	}
 
+	dance({ colorPattern, iterations, speed, transitionTime }) {
+		return new Promise(resolve => {		
+			this.offAll()
+				.then(() => this.onAll())
+				.then(() => this.setTransitionTime(transitionTime))
+				.then(() => this.fullBrightnessAll())
+				.then(() => this.fullSaturationAll())
+				.then(() => {
+					this.setColor(colorPattern[0])
+
+					for (let i = 0; i < iterations; i++) {
+						setTimeout(() => {
+							// Choose colorPattern[0] or colorPattern[1] depending on odd/even number in the iteration
+							this.setColor(colorPattern[Number(i % 2 === 0)])
+						}, (i + 1) * speed )
+					}
+
+					// Resolve the promise when all is done
+					setTimeout(() => {
+						resolve()
+					}, iterations * speed);
+				})
+		})
+	}
+
+	newGoalTrigger() {
+		this.dance({
+			colorPattern: ['yellow', 'blue'],
+			iterations: 20,
+			speed: 1000,
+			transitionTime: 10
+		}).then(() => {
+			this.returnToInitialState()
+		})
+	}
 
 	setBG() {
 		fetch(this.flagUrl)
@@ -162,20 +201,10 @@ class WorldCup {
 		return URL.createObjectURL(blob)
 	}
 
-	newGoalTrigger() {
-		this.dance()
-		/* this.offAll().then(() => {
-			this.onAll().then(() => {
-				this.fullBrightnessAll()
-				this.fullSaturationAll()
-
-				this.dance()
-			})
-		}) */
-	}
-
 	enqueue() {
 		this.getJSON().then(response => {
+			console.log( response )
+
 			if(this.isLoading) {
 				this.hideLoader()
 				this.setBG()
@@ -190,8 +219,9 @@ class WorldCup {
 				: 'away_team'
 
 			if(this.teamGoals !== this.latestAnnouncedGame[teamKey].goals) {
-				this.newGoalTrigger()
 				this.teamGoals = this.latestAnnouncedGame[teamKey].goals
+
+				setTimeout(() => this.newGoalTrigger(), this.streamDelay)
 			}
 			this.teamEvents = this.latestAnnouncedGame[`${teamKey}_events`]
 			this.gameTime = Number(this.latestAnnouncedGame.time)
@@ -248,8 +278,8 @@ class WorldCup {
 	}
 }
 
-const countryCode = 'SWE'
-const interval = 10000 // check api every 10 sec
-const streamDelay = 1000 // delay the blink reaction 5 sec
+const countryCode = 'BRA'
+const interval = 30000 // check api every 30 sec
+const streamDelay = 0 // delay the blink reaction 5 sec
 
 new WorldCup(countryCode, interval, streamDelay)
