@@ -16,13 +16,14 @@ class WorldCup {
 	}
 	
 	init() {
+		this.enqueue()
 		this.showLoader()
 
 		this.initLights().then(lights => {
 			this.hueLights = lights
 			this.initialState = this.setInitialState(lights)
 
-			// this.newGoalTrigger()
+			this.newGoalTrigger()
 
 			this.intervalId = setInterval(() => {
 				this.enqueue()
@@ -34,7 +35,11 @@ class WorldCup {
 	setInitialState(lights) {
 		let initialState = []
 		for(const light in lights) {
-			initialState.push(lights[light].state)
+			initialState.push({
+				bri: lights[light].state.bri,
+				hue: lights[light].state.hue,
+				sat: lights[light].state.sat
+			})
 		}
 
 		return initialState
@@ -43,10 +48,7 @@ class WorldCup {
 	returnToInitialState() {
 		for(let light in this.hueLights) {
 			const index = Number(light - 1)
-
-			this.hue.light(light).setState({ bri: this.initialState[index].bri })
-				.then( this.hue.light(light).setState({ hue: this.initialState[index].hue }) )
-				.then( this.hue.light(light).setState({ sat: this.initialState[index].sat }) )
+			this.hue.light(light).setState(this.initialState[index])
 		}
 	}
 
@@ -168,9 +170,7 @@ class WorldCup {
 			iterations: 20,
 			speed: 1000,
 			transitionTime: 10
-		}).then(() => {
-			this.returnToInitialState()
-		})
+		}).then(() => this.returnToInitialState())
 	}
 
 	setBG() {
@@ -203,14 +203,10 @@ class WorldCup {
 
 	enqueue() {
 		this.getJSON().then(response => {
-			console.log( response )
-
 			if(this.isLoading) {
 				this.hideLoader()
 				this.setBG()
 			}
-
-			this.requestCounter++
 
 			this.latestAnnouncedGame = [...response].pop()
 
@@ -221,14 +217,19 @@ class WorldCup {
 			if(this.teamGoals !== this.latestAnnouncedGame[teamKey].goals) {
 				this.teamGoals = this.latestAnnouncedGame[teamKey].goals
 
-				setTimeout(() => this.newGoalTrigger(), this.streamDelay)
+				// Don't celebrate the first check, it will set the this.teamGoals to the real score in the game
+				if(this.requestCounter !== 0) {
+					setTimeout(() => this.newGoalTrigger(), this.streamDelay)
+				}
 			}
 			this.teamEvents = this.latestAnnouncedGame[`${teamKey}_events`]
 			this.gameTime = Number(this.latestAnnouncedGame.time)
 			this.teamCountry = this.latestAnnouncedGame[`${teamKey}_country`]
 
-			this.updateDOM()
+			this.requestCounter++
 			console.log( 'Number of request: ', this.requestCounter )
+			
+			this.updateDOM()
 
 		})
 	}
@@ -268,18 +269,31 @@ class WorldCup {
 	}
 
 	updateDOM() {
-		if(!this.textElem) {
-			this.textElem = document.createElement('p')
-			this.textElem.innerText = `${this.teamCountry} has ${this.teamGoals} goals in their last announced game.`
-			document.body.appendChild(this.textElem)
+		if(!this.requestCounterElem) {
+			this.requestCounterElem = document.createElement('p')
+			this.requestCounterElem.innerHTML = `🔌 <span>${this.requestCounter}</span>`
+
+			this.requestCounterElem.style = `
+				padding: 10px 20px;
+				margin: 0;
+				position: absolute;
+				left: 20px;
+				top: 20px;
+				color: white;
+				background: rgba(255, 255, 255, .3);
+				border-radius: 20px;
+				box-shadow: 0 0 10px rgba(0, 0, 0, 0.2)
+			`
+
+			document.body.appendChild(this.requestCounterElem)
 		} else {
-			this.textElem.innerText = `${this.teamCountry} has ${this.teamGoals} goals in their last announced game.`
+			this.requestCounterElem.innerHTML = `🔌 <span>${this.requestCounter}</span>`
 		}
 	}
 }
 
-const countryCode = 'BRA'
-const interval = 30000 // check api every 30 sec
+const countryCode = window.location.hash.substr(1).toUpperCase() || 'SWE'
+const interval = 10000 // check api every 10 sec
 const streamDelay = 0 // delay the blink reaction 5 sec
 
 new WorldCup(countryCode, interval, streamDelay)

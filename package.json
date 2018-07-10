@@ -1,12 +1,12 @@
 {
-  "name": "world-cup",
+  "name": "world-cup-philips-hue",
   "version": "1.0.0",
   "description": "",
   "main": "script.js",
   "scripts": {
     "dev": "parcel ./index.html",
-    "build": "npm run clean && parcel build ./index.html --public-url ./",
-    "clean": "rm -rf dist"
+    "build": "npm run clean && parcel build ./index.html --out-dir ./build",
+    "clean": "rm -rf build"
   },
   "repository": {
     "type": "git",
